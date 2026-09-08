@@ -1,17 +1,8 @@
 from datetime import datetime
 import uuid
 
-
-#уникальный идентификатор для сообщения
 def generate_message_id():
     return str(uuid.uuid4())[:8]
-
-
-# Данные о пользователе - демо
-user_name = "Анна Иванова"
-user_email = "anna@example.com"
-user_role = "user" 
-
 
 categories = [
     "Общее",
@@ -19,8 +10,12 @@ categories = [
     "Предложение",
     "Жалоба"
 ]
+#демо данные о пользователе 
+user_name = "Анна Иванова"
+user_email = "anna@example.com"
+user_role = "user" 
 
-
+#тестовое сообщение
 message_category = "Техническая поддержка"
 message_text = "Не могу войти в личный кабинет, пишет ошибка 504"
 message_status = "новая" 
@@ -67,7 +62,7 @@ print(f"Email: {user_email}")
 print(f"Роль: {get_user_role_description(user_role)}")
 
 
-print("СОЗДАНИЕ НОВОГО СООБЩЕНИЯ")
+print("Создание сообщения")
 print(f"\nКатегория: {message_category}")
 print(f"Текст: {message_text}")
 print(f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
@@ -78,20 +73,16 @@ is_valid, validation_message = check_message_validity(message_text, message_cate
 print(f"\nПроверка сообщения: {validation_message}")
 
 if is_valid:
-    #если сообщение валидно создаем его
     message_id = generate_message_id()
     print(f"ID сообщения: {message_id}")
     print(f"Статус: {get_message_status_text(message_status)}")
     
-    # Проверка прав доступа
     if can_create_message:
         print("\nСообщение успешно создано!")
-        
         # Дополнительная логика для администраторов
         if user_role == "admin":
             print("(Администратор: вы можете сразу взять сообщение в обработку)")
-        
-        # Имитация сохранения сообщения
+        # Имитация сохранения
         print(f"\nСохранено: {message_id}_{message_category}_{datetime.now().strftime('%Y%m%d')}")
     else:
         print("\nУ вас нет прав для создания сообщения")
