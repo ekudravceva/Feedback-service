@@ -1,3 +1,5 @@
+"""Точка запуска консольного приложения «Сервис обратной связи»."""
+
 from messages import (
     CATEGORIES,
     add_message,
