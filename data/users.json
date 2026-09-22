@@ -10,5 +10,11 @@
     "name": "Администратор",
     "email": "admin@example.com",
     "role": "admin"
+  },
+  {
+    "id": 3,
+    "name": "Сергей Сергеев",
+    "email": "sergeev@mail.com",
+    "role": "user"
   }
 ]
