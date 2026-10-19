@@ -1,5 +1,3 @@
-"""Точка запуска консольного приложения «Сервис обратной связи»."""
-
 from typing import List, Tuple
 
 from models import CATEGORIES, Message, Response, User
@@ -34,7 +32,6 @@ from utils import input_choice, input_int, input_nonempty_str
 
 
 def seed_demo_data() -> Tuple[List[User], List[Message], List[Response]]:
-    """Создать демонстрационные данные, унаследованные из сценария ПР1."""
     users: List[User] = []
     add_user(users, "Анна Иванова", "anna@example.com", "user")
     add_user(users, "Администратор", "admin@example.com", "admin")

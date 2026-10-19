@@ -4,7 +4,12 @@ import pytest
 
 from models import User
 from models.messages import Message
-from models.responses import cancel_response, create_response, is_message_answered
+from models.responses import (
+    cancel_response,
+    create_response,
+    find_response_by_id,
+    is_message_answered,
+)
 
 
 def make_message() -> Message:
@@ -44,3 +49,10 @@ def test_cancel_response():
     create_response(responses, message, "Ответ администратора на обращение")
     assert cancel_response(responses, 1)
     assert len(responses) == 0
+
+
+def test_find_response_by_id():
+    responses = []
+    response = create_response(responses, make_message(), "Ответ")
+    assert find_response_by_id(responses, response.id) is response
+    assert find_response_by_id(responses, 999) is None

@@ -114,3 +114,11 @@ def show_responses(responses: List[Response]) -> None:
         return
     for response in responses:
         print(response)
+
+
+def find_response_by_id(responses: List[Response], response_id: int) -> Optional[Response]:
+    """Найти ответ по идентификатору."""
+    for response in responses:
+        if response.id == response_id:
+            return response
+    return None
