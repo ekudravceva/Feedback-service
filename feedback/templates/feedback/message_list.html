@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Сообщения – Сервис обратной связи
+{% endblock %}
+
+{% block content %}
+    <h1>Сообщения</h1>
+
+    <p>
+        Всего сообщений: {{ messages_list|length }}
+    </p>
+
+    {% for message in messages_list %}
+        {% include "feedback/includes/message_card.html" %}
+    {% empty %}
+        <p>Сообщения не найдены.</p>
+    {% endfor %}
+{% endblock %}

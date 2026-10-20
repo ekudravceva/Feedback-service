@@ -2,7 +2,9 @@ from django.urls import path
 
 from . import views
 
+app_name = "feedback"
+
 urlpatterns = [
-    path("", views.messages, name="messages"),
-    path("<int:message_id>/", views.message_detail, name="message_detail"),
+    path("", views.messages, name="list"),
+    path("<int:message_id>/", views.message_detail, name="detail"),
 ]

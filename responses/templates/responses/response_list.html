@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Ответы – Сервис обратной связи
+{% endblock %}
+
+{% block content %}
+    <h1>Ответы</h1>
+
+    <p>
+        Всего ответов: {{ responses_list|length }}
+    </p>
+
+    <ul class="list-group">
+        {% for response in responses_list %}
+            <li class="list-group-item">
+                <a href="{% url 'responses:detail' response.id %}">
+                    Ответ №{{ response.id }}
+                    на сообщение {{ response.message.id|default:"—" }}
+                </a>
+                <span class="text-muted">– {{ response.created_at }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">
+                Ответы не найдены.
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

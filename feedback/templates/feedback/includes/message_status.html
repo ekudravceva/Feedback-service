@@ -1,0 +1,13 @@
+{% if message.status == "закрыта" %}
+    <span class="badge bg-success message-status message-status-closed">
+        {{ message.get_status_text }}
+    </span>
+{% elif message.status == "в обработке" %}
+    <span class="badge bg-warning text-dark message-status message-status-processing">
+        {{ message.get_status_text }}
+    </span>
+{% else %}
+    <span class="badge bg-primary message-status message-status-new">
+        {{ message.get_status_text }}
+    </span>
+{% endif %}

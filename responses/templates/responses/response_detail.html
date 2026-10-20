@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if response %}
+        Ответ №{{ response.id }} – Сервис обратной связи
+    {% else %}
+        Ответ не найден – Сервис обратной связи
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if response %}
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title">
+                    Ответ №{{ response.id }}
+                </h1>
+
+                <p class="card-text">
+                    <strong>Исходное сообщение:</strong>
+                    {% if response.message %}
+                        <a href="{% url 'feedback:detail' response.message.id %}">
+                            Сообщение №{{ response.message.id }}
+                        </a>:
+                        {{ response.message.text }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </p>
+
+                <p class="card-text">
+                    <strong>Автор сообщения:</strong>
+                    {{ response.message.author.name|default:"—" }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Дата ответа:</strong>
+                    {{ response.created_at }}
+                </p>
+
+                <p class="card-text">
+                    {{ response.text|linebreaksbr }}
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Ответ не найден</h1>
+        <p>
+            Ответ с указанным идентификатором отсутствует.
+        </p>
+    {% endif %}
+
+    <a
+        href="{% url 'responses:list' %}"
+        class="btn btn-outline-secondary mt-3"
+    >
+        ← к списку ответов
+    </a>
+{% endblock %}

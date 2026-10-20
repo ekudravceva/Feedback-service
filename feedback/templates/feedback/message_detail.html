@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if message %}
+        Сообщение №{{ message.id }} – Сервис обратной связи
+    {% else %}
+        Сообщение не найдено – Сервис обратной связи
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if message %}
+        <div class="card message-card">
+            <div class="card-body">
+                <h1 class="card-title">
+                    Сообщение №{{ message.id }}
+                </h1>
+
+                <p class="card-text">
+                    <strong>Автор:</strong>
+                    {{ message.author.name|default:"Автор не указан" }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Категория:</strong>
+                    {{ message.category }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Дата:</strong>
+                    {{ message.created_at }}
+                </p>
+
+                <p class="card-text">
+                    {{ message.text|linebreaksbr }}
+                </p>
+
+                <p class="card-text">
+                    <strong>Статус:</strong>
+                    {% include "feedback/includes/message_status.html" %}
+                </p>
+
+                <p class="card-text">
+                    <strong>Ответ:</strong>
+                    {% if message_responses %}
+                        {% for response in message_responses %}
+                            <a href="{% url 'responses:detail' response.id %}">
+                                Ответ №{{ response.id }}
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        ответа пока нет
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <h1 class="text-danger">Сообщение не найдено</h1>
+        <p>
+            Сообщение с указанным идентификатором отсутствует.
+        </p>
+    {% endif %}
+
+    <a
+        href="{% url 'feedback:list' %}"
+        class="btn btn-outline-secondary mt-3"
+    >
+        ← к списку сообщений
+    </a>
+{% endblock %}

@@ -1,0 +1,29 @@
+<article class="card message-card mb-3">
+    <div class="card-body">
+        <h2 class="card-title h5">
+            Сообщение №{{ message.id }}
+            {% include "feedback/includes/message_status.html" %}
+        </h2>
+
+        <p class="card-text">
+            <strong>Категория:</strong>
+            {{ message.category|default:"Без категории" }}
+        </p>
+
+        <p class="card-text">
+            <strong>Автор:</strong>
+            {{ message.author.name|default:"Автор не указан" }}
+        </p>
+
+        <p class="card-text">
+            {{ message.text|truncatechars:80 }}
+        </p>
+
+        <a
+            href="{% url 'feedback:detail' message.id %}"
+            class="btn btn-primary"
+        >
+            Подробнее
+        </a>
+    </div>
+</article>

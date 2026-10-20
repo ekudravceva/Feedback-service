@@ -3,9 +3,10 @@
 ## Назначение
 
 Приложение для сбора, обработки и управления отзывами и обращениями
-пользователей. Консольная версия (ПР3) дополнена веб-интерфейсом на Django (ПР5). Сервис позволяет пользователям оставлять сообщения с обратной
-связью по различным категориям, а администраторам — управлять этими
-сообщениями и давать на них ответы.
+пользователей. Консольная версия (ПР3) дополнена веб-интерфейсом на Django (ПР5), который
+в ПР6 переведён на систему шаблонов Django. Сервис позволяет пользователям
+оставлять сообщения с обратной связью по различным категориям, а
+администраторам — управлять этими сообщениями и давать на них ответы.
 
 ## Целевая аудитория
 
@@ -33,8 +34,12 @@
 
 - Python 3;
 - Django 5.2 — веб-фреймворк;
-- HTML — разметка веб-страниц;
-- CSS и Bootstrap 5.3 — оформление страниц (подключается через CDN);
+- Django Template Language (DTL) — шаблоны веб-страниц;
+- HTML5 — разметка веб-страниц;
+- CSS3 и Bootstrap 5.3 — оформление страниц (Bootstrap подключается через
+  CDN, собственные стили — через static-файлы);
+- JavaScript — небольшое клиентское поведение интерфейса;
+- JSON — хранение данных;
 - pytest — автоматизированные тесты;
 - flake8 — проверка качества кода;
 - mypy — статическая проверка типов.
@@ -141,18 +146,19 @@
 
 ## Страницы веб-интерфейса
 
-- `/` — главная страница: описание и навигация (`index()`);
-- `/messages/` — список сообщений из `data/messages.json` (`messages()`);
-- `/messages/<int:message_id>/` — страница сообщения: автор, категория,
-  статус, наличие ответа (`message_detail()`);
-- `/responses/` — список ответов из `data/responses.json` (`responses()`);
-- `/responses/<int:response_id>/` — страница ответа со ссылкой на исходное
-  сообщение (`response_detail()`).
+| URL | Имя маршрута | View | Шаблон |
+|---|---|---|---|
+| `/` | `homepage:index` | `index()` | `homepage/index.html` |
+| `/messages/` | `feedback:list` | `messages()` | `feedback/message_list.html` |
+| `/messages/<int:message_id>/` | `feedback:detail` | `message_detail()` | `feedback/message_detail.html` |
+| `/responses/` | `responses:list` | `responses()` | `responses/response_list.html` |
+| `/responses/<int:response_id>/` | `responses:detail` | `response_detail()` | `responses/response_detail.html` |
 
 Если сообщение или ответ с указанным идентификатором не найден, страница
-возвращает код статуса 404. Для несуществующих адресов настроена собственная
-страница 404 (`handler404` в `feedback_service/urls.py`, функция
-`page_not_found()`; видна при `DEBUG = False`).
+возвращает код статуса 404 (`status=404 if ... is None else 200`). Для
+несуществующих адресов настроена собственная страница 404 (`handler404` в
+`feedback_service/urls.py`, view `page_not_found()`, шаблон
+`homepage/404.html`; видна при `DEBUG = False`).
 
 В веб-интерфейсе используется только просмотр данных: загрузка из JSON,
 поиск по идентификатору (`find_message_by_id()`, `find_response_by_id()`) и
@@ -191,18 +197,89 @@
 При сохранении объекты преобразуются обратно в словари с идентификаторами
 связанных объектов.
 
+## Шаблоны Django (ПР6)
+
+HTML больше не формируется в Python: view-функции только загружают данные,
+готовят контекст и вызывают `render(request, "шаблон.html", context)`.
+Функция `page()` из ПР5 удалена.
+
+### Базовый шаблон и наследование
+
+`templates/base.html` содержит общую структуру страницы: подключение
+Bootstrap и собственного CSS, логотип, навигацию, контейнер, подвал и
+JavaScript. Дочерние шаблоны наследуют его через `{% extends "base.html" %}` и
+переопределяют блоки `{% block title %}` и `{% block content %}`. Каталог
+`templates/` подключён в `TEMPLATES["DIRS"]` в `settings.py`.
+
+### Включаемые шаблоны (`{% include %}`)
+
+- `templates/includes/navigation.html` — навигация (подключается в
+  `base.html`);
+- `feedback/includes/message_card.html` — карточка одного сообщения в списке;
+- `feedback/includes/message_status.html` — бейдж статуса сообщения
+  (`новая` / `в обработке` / `закрыта`), используется и в списке, и на
+  странице сообщения.
+
+### Контекст, циклы и условия
+
+Передача данных через контекст, например для списка сообщений:
+
+```python
+context = {"messages_list": messages_list}
+return render(request, "feedback/message_list.html", context)
+```
+
+В шаблонах используются `{% for %}` с `{% empty %}` (пустые списки
+сообщений и ответов) и `{% if %}` / `{% elif %}` / `{% else %}` (статус
+сообщения, наличие сообщения и ответа, отсутствующий объект).
+Ключ контекста назван `messages_list`, а не `messages`, чтобы не пересекаться
+с переменной `messages` встроенного context processor Django.
+
+### Именованные URL и пространства имён
+
+В `urls.py` приложений заданы `app_name` и имена маршрутов: `homepage:index`,
+`feedback:list`, `feedback:detail`, `responses:list`, `responses:detail`.
+Ссылки в шаблонах формируются тегом `{% url %}`, например
+`{% url 'feedback:detail' message.id %}`; жёстко заданных адресов нет.
+
+### Фильтры шаблонов
+
+- `{{ messages_list|length }}` — количество сообщений;
+- `{{ message.author.name|default:"Автор не указан" }}` — значение по
+  умолчанию;
+- `{{ message.text|truncatechars:80 }}` — сокращение длинного текста в списке;
+- `{{ message.text|linebreaksbr }}` — переносы строк в тексте сообщения.
+
+Текст из `{{ ... }}` экранируется автоматически, поэтому HTML-теги в тексте
+сообщений не выполняются. Дата создания хранится в JSON строкой и выводится
+без фильтра `date`.
+
+### Статические файлы
+
+Находятся в `homepage/static/homepage/` и подключаются через
+`{% load static %}` и `{% static %}`:
+
+- `css/style.css` — собственные стили (логотип, карточки сообщений, статусы);
+- `js/main.js` — подстановка текущего года в подвал;
+- `img/logo.png` — логотип сервиса.
+
 ## Структура Django-проекта
 
 - `manage.py` — запуск команд Django;
 - `feedback_service/` — пакет настроек проекта (`settings.py`, `urls.py` —
   корневая маршрутизация, `asgi.py`, `wsgi.py`);
-- `homepage/` — главная страница; `views.py` содержит функцию `page()`
-  (общий HTML-каркас с Bootstrap и навигацией), `index()` и обработчик 404
-  `page_not_found()`;
+- `templates/` — шаблоны уровня проекта: `base.html`,
+  `includes/navigation.html`;
+- `homepage/` — главная страница: `views.py` (`index()`, обработчик 404
+  `page_not_found()`), `urls.py`, `templates/homepage/` (`index.html`,
+  `404.html`), `static/homepage/` (CSS, JS, логотип);
 - `feedback/` — приложение сообщений: `views.py` (`messages()`,
-  `message_detail()`), `urls.py`;
+  `message_detail()`), `urls.py`, `templates/feedback/` (`message_list.html`,
+  `message_detail.html`, `includes/message_card.html`,
+  `includes/message_status.html`);
 - `responses/` — приложение ответов: `views.py` (`responses()`,
-  `response_detail()`), `urls.py`;
+  `response_detail()`), `urls.py`, `templates/responses/`
+  (`response_list.html`, `response_detail.html`);
 - пользователи отдельного приложения не имеют: Django предоставляет
   встроенную модель `User`; класс `User` из `models/users.py` используется как
   часть предметной области.
@@ -269,7 +346,7 @@
 
 ```
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\\activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 ```
@@ -300,12 +377,14 @@ python manage.py test
 ```
 
 `pytest` проверяет предметную область (ПР3), `manage.py test` — страницы
-Django-приложений.
+Django-приложений: используемые шаблоны, пространства имён URL, коды ответов
+(в том числе 404), пустые списки, экранирование HTML и подключение
+статических файлов.
 
 ## Проверка качества кода
 
 ```
-flake8
+flake8 . --extend-exclude=venv
 ```
 
 Каталог `venv/` исключён из проверки в `.flake8`.
@@ -332,9 +411,26 @@ git status
 
 Реализовано:
 
+- предметные классы `User`, `Message`, `Response`, консольный интерфейс,
+  хранение данных в JSON, тесты;
 - Django-проект и три приложения (`homepage`, `feedback`, `responses`);
-- маршрутизация двух уровней (`include()`), динамические URL;
-- view-функции, страницы и навигация, оформление Bootstrap 5.3;
-- отображение данных предметной области (сообщения, ответы);
+- маршрутизация двух уровней (`include()`), динамические URL, именованные
+  маршруты и пространства имён;
+- веб-страницы на Django-шаблонах: базовый шаблон, наследование, блоки,
+  включаемые шаблоны, контекст, циклы и условия, фильтры;
+- собственные статические файлы (CSS, JavaScript, изображение) и Bootstrap 5.3;
 - собственная страница 404;
-- консольная версия и тесты ПР3 сохранены.
+- отображение данных предметной области (сообщения, ответы).
+
+Данные пока хранятся в JSON, Django ORM и база данных приложения не
+используются, формы Django не реализованы.
+
+Планируется:
+
+- перенос сущностей `User`, `Message` и `Response` в Django ORM и подключение
+  базы данных;
+- формы создания сообщений и ответов (с использованием логики консольной
+  версии: `add_message()`, `create_response()`, поиск, фильтрация,
+  статистика);
+- аутентификация пользователей;
+- разработка API.
