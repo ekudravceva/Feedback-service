@@ -18,19 +18,15 @@
 
                 <p class="card-text">
                     <strong>Исходное сообщение:</strong>
-                    {% if response.message %}
-                        <a href="{% url 'feedback:detail' response.message.id %}">
-                            Сообщение №{{ response.message.id }}
-                        </a>:
-                        {{ response.message.text }}
-                    {% else %}
-                        —
-                    {% endif %}
+                    <a href="{% url 'feedback:detail' response.message_id %}">
+                        Сообщение №{{ response.message_id }}
+                    </a>:
+                    {{ response.message_text }}
                 </p>
 
                 <p class="card-text">
                     <strong>Автор сообщения:</strong>
-                    {{ response.message.author.name|default:"—" }}
+                    {{ response.author_name|default:"—" }}
                 </p>
 
                 <p class="card-text">

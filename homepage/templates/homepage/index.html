@@ -14,7 +14,10 @@
     <a href="{% url 'feedback:list' %}" class="btn btn-primary me-2">
         Сообщения
     </a>
-    <a href="{% url 'responses:list' %}" class="btn btn-secondary">
+    <a href="{% url 'responses:list' %}" class="btn btn-secondary me-2">
         Ответы
+    </a>
+    <a href="{% url 'feedback:statistics' %}" class="btn btn-outline-primary">
+        Статистика
     </a>
 {% endblock %}

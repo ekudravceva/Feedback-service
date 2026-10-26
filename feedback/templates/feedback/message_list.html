@@ -11,6 +11,15 @@
         Всего сообщений: {{ messages_list|length }}
     </p>
 
+    <p>
+        <a href="{% url 'feedback:search' %}" class="btn btn-outline-primary me-2">
+            Найти сообщение
+        </a>
+        <a href="{% url 'feedback:unanswered' %}" class="btn btn-outline-secondary">
+            Сообщения без ответа
+        </a>
+    </p>
+
     {% for message in messages_list %}
         {% include "feedback/includes/message_card.html" %}
     {% empty %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Статистика – Сервис обратной связи
+{% endblock %}
+
+{% block content %}
+    <h1>Статистика сообщений</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card statistics-item">
+                <div class="card-body">
+                    <h2 class="h6">Всего сообщений</h2>
+                    <p class="display-6">{{ total.messages_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card statistics-item">
+                <div class="card-body">
+                    <h2 class="h6">Без ответа</h2>
+                    <p class="display-6">{{ unanswered_count.unanswered_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card statistics-item">
+                <div class="card-body">
+                    <h2 class="h6">Период обращений</h2>
+                    <p class="mb-0">
+                        {{ total.first_message|default:"—" }}<br>
+                        {{ total.last_message|default:"—" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="h4">По статусам</h2>
+    <ul class="list-group mb-4">
+        {% for item in by_status %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ item.status|capfirst }}</span>
+                <span class="badge bg-primary">{{ item.messages_count }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">Данные отсутствуют.</li>
+        {% endfor %}
+    </ul>
+
+    <h2 class="h4">По категориям</h2>
+    <ul class="list-group mb-4">
+        {% for item in by_category %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ item.category }}</span>
+                <span class="badge bg-primary">{{ item.messages_count }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">Данные отсутствуют.</li>
+        {% endfor %}
+    </ul>
+
+    <h2 class="h4">По авторам</h2>
+    <ul class="list-group mb-4">
+        {% for item in by_author %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ item.author_name }}</span>
+                <span class="badge bg-secondary">{{ item.messages_count }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">Данные отсутствуют.</li>
+        {% endfor %}
+    </ul>
+
+    <h2 class="h4">Активные авторы</h2>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <label for="more_than" class="col-form-label">
+                Авторы, оставившие больше
+            </label>
+        </div>
+        <div class="col-auto">
+            <input
+                type="number"
+                min="0"
+                id="more_than"
+                name="more_than"
+                value="{{ more_than }}"
+                class="form-control"
+            >
+        </div>
+        <div class="col-auto">
+            <span class="col-form-label">сообщений</span>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-primary">Показать</button>
+        </div>
+    </form>
+    <ul class="list-group">
+        {% for item in active_authors %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ item.author_name }}</span>
+                <span class="badge bg-success">{{ item.messages_count }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">
+                Нет авторов, оставивших больше {{ more_than }} сообщений.
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

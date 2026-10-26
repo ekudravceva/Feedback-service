@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Сообщения без ответа – Сервис обратной связи
+{% endblock %}
+
+{% block content %}
+    <h1>Сообщения без ответа</h1>
+
+    <p>
+        Всего: {{ messages_list|length }}
+    </p>
+
+    {% for message in messages_list %}
+        {% include "feedback/includes/message_card.html" %}
+    {% empty %}
+        <p>На все сообщения уже даны ответы.</p>
+    {% endfor %}
+
+    <a href="{% url 'feedback:list' %}" class="btn btn-outline-secondary mt-3">
+        ← ко всем сообщениям
+    </a>
+{% endblock %}

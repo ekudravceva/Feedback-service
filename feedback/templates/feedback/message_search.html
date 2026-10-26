@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Поиск сообщений – Сервис обратной связи
+{% endblock %}
+
+{% block content %}
+    <h1>Поиск сообщений</h1>
+
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label for="category" class="form-label">Категория</label>
+            <select id="category" name="category" class="form-select">
+                <option value="">Любая</option>
+                {% for item in categories %}
+                    <option value="{{ item }}" {% if item == category %}selected{% endif %}>
+                        {{ item }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label for="status" class="form-label">Статус</label>
+            <select id="status" name="status" class="form-select">
+                <option value="">Любой</option>
+                {% for item in statuses %}
+                    <option value="{{ item }}" {% if item == status %}selected{% endif %}>
+                        {{ item|capfirst }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label for="date_from" class="form-label">Начиная с даты</label>
+            <input
+                type="date"
+                id="date_from"
+                name="date_from"
+                value="{{ date_from }}"
+                class="form-control"
+            >
+        </div>
+
+        <div class="col-md-8">
+            <label for="q" class="form-label">Текст содержит</label>
+            <input
+                type="text"
+                id="q"
+                name="q"
+                value="{{ query }}"
+                class="form-control"
+            >
+        </div>
+
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">Найти</button>
+            <a href="{% url 'feedback:search' %}" class="btn btn-outline-secondary">
+                Сбросить
+            </a>
+        </div>
+    </form>
+
+    {% if date_error %}
+        <p class="text-danger">
+            Дата указана неверно (нужен формат ГГГГ-ММ-ДД), условие по дате не учтено.
+        </p>
+    {% endif %}
+
+    {% if searched %}
+        <h2 class="h5">Найдено сообщений: {{ results|length }}</h2>
+
+        {% for message in results %}
+            {% include "feedback/includes/message_card.html" %}
+        {% empty %}
+            <p>По заданным условиям сообщений не найдено.</p>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">
+            Задайте одно или несколько условий и нажмите «Найти».
+        </p>
+    {% endif %}
+
+    <a href="{% url 'feedback:list' %}" class="btn btn-outline-secondary mt-3">
+        ← ко всем сообщениям
+    </a>
+{% endblock %}

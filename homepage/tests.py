@@ -29,6 +29,7 @@ class HomepageTests(TestCase):
         response = self.client.get("/")
         self.assertContains(response, f'href="{reverse("feedback:list")}"')
         self.assertContains(response, f'href="{reverse("responses:list")}"')
+        self.assertContains(response, f'href="{reverse("feedback:statistics")}"')
 
     def test_static_files_connected(self):
         response = self.client.get("/")

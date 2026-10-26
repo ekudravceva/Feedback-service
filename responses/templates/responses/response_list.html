@@ -16,7 +16,7 @@
             <li class="list-group-item">
                 <a href="{% url 'responses:detail' response.id %}">
                     Ответ №{{ response.id }}
-                    на сообщение {{ response.message.id|default:"—" }}
+                    на сообщение {{ response.message_id|default:"—" }}
                 </a>
                 <span class="text-muted">– {{ response.created_at }}</span>
             </li>
