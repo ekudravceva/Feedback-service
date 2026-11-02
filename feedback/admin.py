@@ -1,1 +1,5 @@
-# Регистрация моделей в админ-панели появится вместе с моделями.
+from django.contrib import admin
+
+from feedback.models import Message
+
+admin.site.register(Message)

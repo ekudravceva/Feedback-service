@@ -3,8 +3,9 @@
 ## Назначение
 
 Приложение для сбора, обработки и управления отзывами и обращениями
-пользователей. Консольная версия дополнена веб-интерфейсом на Django, который в ПР6 переведён на систему шаблонов Django, а в ПР7 получает
-данные из реляционной базы SQLite с помощью SQL-запросов. Сервис позволяет
+пользователей. Консольная версия дополнена веб-интерфейсом на Django, который в ПР6 переведён на систему шаблонов Django, в ПР7 получал
+данные из реляционной базы SQLite SQL-запросами, а в ПР9 переведён на Django ORM
+(модели, миграции, ORM-запросы). Сервис позволяет
 пользователям оставлять сообщения с обратной связью по различным категориям,
 а администраторам — управлять этими сообщениями и давать на них ответы.
 
@@ -39,8 +40,9 @@
 - CSS3 и Bootstrap 5.3 — оформление страниц (Bootstrap подключается через
   CDN, собственные стили — через static-файлы);
 - JavaScript — небольшое клиентское поведение интерфейса;
-- SQLite и SQL — реляционное хранение данных и запросы к ним;
-- sqlite3 (стандартная библиотека Python) — работа с базой из Python;
+- SQLite — реляционное хранение данных;
+- Django ORM и миграции — модели, связи и запросы к базе (ПР9);
+- SQL и sqlite3 — слой ПР7 и источник данных для переноса (`sql/`, `db/`);
 - JSON — исходные данные и хранилище консольной версии;
 - pytest — автоматизированные тесты;
 - flake8 — проверка качества кода;
@@ -159,16 +161,16 @@
 | `/responses/` | `responses:list` | `responses()` | `responses/response_list.html` |
 | `/responses/<int:response_id>/` | `responses:detail` | `response_detail()` | `responses/response_detail.html` |
 
-Все страницы, кроме главной, получают данные из базы SQLite SQL-запросами
-(подробнее — в разделе «База данных»). Если сообщение или ответ с указанным
-идентификатором не найден, страница возвращает код статуса 404
-(`status=404 if ... is None else 200`). Для несуществующих адресов настроена
+Все страницы, кроме главной, получают данные через Django ORM
+(подробнее — в разделе «Django ORM (ПР9)»). Если сообщение или ответ с
+указанным идентификатором не найден, `get_object_or_404()` возвращает код
+статуса 404. Для несуществующих адресов настроена
 собственная страница 404 (`handler404` в `feedback_service/urls.py`, view
 `page_not_found()`, шаблон `homepage/404.html`; видна при `DEBUG = False`).
 
 Пользовательские сценарии веб-интерфейса:
 
-1. просмотр списка сообщений (`/messages/`);
+1. просмотр списка сообщений с фильтрами, сортировкой и пагинацией (`/messages/`);
 2. просмотр сообщения с автором и ответом (`/messages/<id>/`);
 3. просмотр списка ответов и ответа с исходным сообщением (`/responses/…`);
 4. поиск сообщений по категории, статусу, тексту и дате (`/messages/search/`);
@@ -302,9 +304,9 @@ python -m db.import_json
   авторам (включая авторов без сообщений), авторы и категории с количеством
   сообщений выше порога.
 
-### Получение данных в Django-представлениях
+### Получение данных в Django-представлениях (ПР7, заменено ORM в ПР9)
 
-Представления `feedback/views.py` и `responses/views.py` подключаются к базе
+В ПР7 представления `feedback/views.py` и `responses/views.py` подключались к базе
 через `get_connection()`, настраивают `conn.row_factory = sqlite3.Row`,
 выполняют запрос, закрывают соединение и передают строки в шаблон через
 `context`. Благодаря `sqlite3.Row` к полям результата можно обращаться по
@@ -322,6 +324,75 @@ message = conn.execute(DETAIL_SQL, [message_id]).fetchone()
 (`(? = '' OR messages.category = ?)`), поэтому текст запроса остаётся
 постоянным. Если в базе нет подходящих записей, шаблоны выводят сообщение
 через `{% empty %}`.
+
+## Django ORM (ПР9)
+
+### Модели и связи
+
+| Модель | Приложение | Поля | Связи |
+|---|---|---|---|
+| `User` | `users` | `name`, `email`, `role` (`user` / `admin`) | — |
+| `Message` | `feedback` | `author`, `category`, `text`, `status`, `created_at` | `author` — `ForeignKey(User, on_delete=PROTECT, related_name="messages")` |
+| `Response` | `responses` | `message`, `text`, `created_at` | `message` — `ForeignKey(Message, on_delete=PROTECT, related_name="responses")`, `UniqueConstraint` по `message` (один ответ на сообщение) |
+
+`PROTECT` не позволяет удалить пользователя с сообщениями и сообщение с
+ответом — история обращений сохраняется. Обратные связи:
+`user.messages.all()`, `message.responses.all()`. Методы моделей:
+`User.get_role_description()`, `User.can_create_message()`,
+`Message.mark_closed()`, `Message.matches()`. Модель `users.User` — сущность
+предметной области, а не модель аутентификации Django.
+
+### Стратегия перехода и миграции
+
+Выбран вариант «создать таблицы Django и перенести данные»: исходная база
+`data/feedback.sqlite` (ПР7) не изменяется, Django работает с `db.sqlite3`.
+Столбец `messages.user_id` исходной базы соответствует полю `Message.author`
+(`author_id`). Файлы миграций (`*/migrations/0001_initial.py`) хранятся в Git.
+
+```
+python manage.py makemigrations
+python manage.py migrate
+python db/import_sqlite_to_orm.py
+```
+
+Скрипт переноса читает источник, затем в одной транзакции
+(`transaction.atomic()`) через `update_or_create(pk=...)` создаёт
+пользователей, сообщения и ответы с сохранением идентификаторов; даты
+преобразуются в aware-`datetime`. Повторный запуск безопасен. Проверка:
+`python manage.py shell` → `Message.objects.count()` и т. п. Отмена изменений
+структуры — `python manage.py migrate <app> zero`.
+
+### ORM-запросы в представлениях
+
+| Направление | Запрос | Где |
+|---|---|---|
+| Получение набора | `Message.objects.select_related("author")`, `Response.objects.select_related("message", "message__author")` | список сообщений и ответов |
+| Получение объекта | `get_object_or_404(...)` | карточки сообщения и ответа |
+| Фильтрация | `filter(category=…)`, `filter(status=…)`, цепочка условий | `/messages/` |
+| Фильтрация по связанной модели | `filter(author_id=…)`, `order_by("author__name")` | `/messages/` |
+| Исключение | `exclude(status="закрыта")` | `/messages/?hide_closed=1` |
+| Фильтр по дате | `filter(created_at__date__gte=…)` | `/messages/search/` |
+| Поиск по полю | `filter(text__iregex=re.escape(q))` | `/messages/search/` |
+| Поиск по нескольким полям | `Q(text__iregex=…) \| Q(author__name__iregex=…)` | `/messages/search/` |
+| Сортировка | `order_by(поле, "-pk")`, поле выбирается из словаря `SORT_FIELDS` | `/messages/` |
+| Связи | `select_related()`, обратная связь `message.responses.all()` | карточки |
+| Отсутствие связанных | `filter(responses__isnull=True)` (LEFT JOIN) | `/messages/unanswered/` |
+| Сводные показатели | `aggregate(Count, Min, Max)`, `.count()` | `/messages/statistics/` |
+| Группировка | `values("status").annotate(Count("pk"))`, то же по категории | статистика |
+| Аннотация | `User.objects.annotate(Count("messages"))` — авторы без сообщений тоже попадают в результат | статистика |
+| Фильтр по агрегату | `filter(messages_count__gt=N)` | «Активные авторы» |
+| Постраничный вывод | `Paginator(queryset, 5)`, `get_page()` | `/messages/` |
+
+Параметры запроса проверяются: неизвестные категория, статус и поле
+сортировки игнорируются (сортировка — по умолчанию), некорректный `page`
+открывает первую страницу, некорректная дата выводит сообщение, пустые
+результаты — сообщение через `{% empty %}`. Ссылки пагинации строятся тегом
+`{% querystring %}` и сохраняют фильтры и сортировку. Регистронезависимый поиск
+по кириллице выполнен через `iregex`: `LIKE` и `LOWER()` в SQLite различают
+регистр только для латиницы.
+
+SQL-слой ПР7 (`sql/`, `db/database.py`, `db/import_json.py`) сохранён как
+предыдущая реализация; представления его больше не используют.
 
 ## Шаблоны Django (ПР6)
 
@@ -401,25 +472,27 @@ return render(request, "feedback/message_list.html", context)
 - `homepage/` — главная страница: `views.py` (`index()`, обработчик 404
   `page_not_found()`), `urls.py`, `templates/homepage/` (`index.html`,
   `404.html`), `static/homepage/` (CSS, JS, логотип);
-- `feedback/` — приложение сообщений: `views.py` (`messages()`,
+- `feedback/` — приложение сообщений: `models.py` (`Message`), `migrations/`, `views.py` (`messages()`,
   `message_detail()`, `search()`, `unanswered()`, `statistics()`), `urls.py`,
   `templates/feedback/` (`message_list.html`, `message_detail.html`,
   `message_search.html`, `message_unanswered.html`, `statistics.html`,
   `includes/message_card.html`, `includes/message_status.html`);
-- `responses/` — приложение ответов: `views.py` (`responses()`,
+- `responses/` — приложение ответов: `models.py` (`Response`), `migrations/`, `views.py` (`responses()`,
   `response_detail()`), `urls.py`, `templates/responses/`
   (`response_list.html`, `response_detail.html`);
-- `db/` — слой базы данных SQLite (`database.py`, `import_json.py`);
+- `db/` — слой SQLite из ПР7 (`database.py`, `import_json.py`) и перенос в ORM;
 - `sql/` — SQL-файлы (`schema.sql`, `queries.sql`);
-- `data/` — JSON-файлы (консольная версия) и база `feedback.sqlite`;
-- пользователи отдельного приложения не имеют: Django предоставляет
-  встроенную модель `User`; класс `User` из `models/users.py` используется как
-  часть предметной области.
+- `data/` — JSON-файлы (консольная версия) и исходная база `feedback.sqlite`;
+- `db.sqlite3` — база Django (в репозиторий не входит, создаётся миграциями);
+- `users/` — приложение пользователей: модель `User`, миграции;
+- `db/import_sqlite_to_orm.py` — перенос данных из `data/feedback.sqlite` в
+  базу Django (ПР9); `db/testing.py` — тестовые данные для веб-тестов.
 
 Приложение сообщений названо `feedback`, а не `messages`, так как имя
 `messages` уже занято встроенным `django.contrib.messages`. Файлы `models.py`
-приложений пока пусты: Django-модели появятся на следующих работах.
-Классы предметной области лежат в пакете `models/` в корне проекта.
+приложений содержат Django-модели (ПР9). Классы предметной области консольной
+версии лежат в пакете `models/` в корне проекта и от Django-моделей не
+зависят.
 
 ## Назначение модулей
 
@@ -488,12 +561,13 @@ return render(request, "feedback/message_list.html", context)
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python manage.py migrate
-python -m db.import_json     # создать базу данных SQLite и перенести данные из JSON
+python manage.py migrate                 # создать таблицы Django в db.sqlite3
+python db/import_sqlite_to_orm.py        # перенести данные из data/feedback.sqlite
 ```
 
-Файл `data/feedback.sqlite` лежит в репозитории, поэтому последний шаг нужен
-только при отсутствии базы или для её пересоздания (`--reset`).
+Файл `data/feedback.sqlite` (база ПР7) лежит в репозитории и служит только
+источником данных; Django работает с `db.sqlite3`. Если исходной базы нет, её
+можно создать командой `python -m db.import_json` (ПР7).
 
 Веб-версия (Django):
 
@@ -520,11 +594,11 @@ pytest
 python manage.py test
 ```
 
-`pytest` проверяет предметную область (ПР3), `manage.py test` — страницы
-Django-приложений: используемые шаблоны, пространства имён URL, коды ответов
-(в том числе 404), пустые списки, экранирование HTML, подключение
-статических файлов, поиск, статистика и получение данных из SQLite.
-Веб-тесты работают с временной базой данных, а не с `data/feedback.sqlite`.
+`pytest` проверяет предметную область (ПР3) и слой SQL ПР7, `manage.py test` —
+модели и страницы Django-приложений: шаблоны, пространства имён URL, коды
+ответов (в том числе 404), пустые списки, экранирование HTML, статические
+файлы, фильтры, сортировку, пагинацию, поиск, статистику, ограничения связей.
+Веб-тесты работают с тестовой базой Django, а не с `db.sqlite3`.
 
 ## Проверка качества кода
 
@@ -563,11 +637,13 @@ git status
 - веб-страницы на Django-шаблонах (базовый шаблон, наследование, `include`,
   контекст, циклы, условия, фильтры), собственные CSS, JavaScript и
   изображение, Bootstrap 5.3, собственная страница 404;
-- **ПР7:** реляционная база SQLite (три таблицы, первичные и внешние ключи),
+- реляционная база SQLite (три таблицы, первичные и внешние ключи),
   `sql/schema.sql`, перенос данных из JSON (`db/import_json.py`), 22 SQL-запроса
   в `sql/queries.sql`, получение данных из SQLite в Django-представлениях
   (`sqlite3.Row`, параметризованные запросы), страницы списка и карточки
   сообщения, ответов, поиска, сообщений без ответа и статистики.
+- модели Django `User`, `Message`, `Response` со связями, миграции,
+  перенос данных из базы ПР7, все представления переведены на ORM, фильтрация,
+  сортировка и пагинация списка сообщений.
 
-Django ORM, модели Django и формы пока не используются; база SQLite
-обслуживается напрямую через `sqlite3` и существует отдельно от Django ORM.
+Формы создания сообщений и ответов через веб-интерфейс пока не реализованы.

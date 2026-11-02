@@ -142,11 +142,11 @@ def test_all_queries_run_on_real_schema(filled):
         filled.execute(query).fetchall()
 
 
-def test_queries_use_parameters_not_string_building():
-    from feedback import views as feedback_views
-    from responses import views as responses_views
-
-    for module in (feedback_views, responses_views):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert 'f"""' not in source
+def test_views_use_orm_not_raw_sql():
+    """Представления получают данные через ORM, без sqlite3 и сырого SQL."""
+    for app in ("feedback", "responses"):
+        source = (ROOT / app / "views.py").read_text(encoding="utf-8")
+        assert "sqlite3" not in source
+        assert "get_connection" not in source
+        assert ".raw(" not in source
         assert ".format(" not in source

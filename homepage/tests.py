@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -48,6 +49,6 @@ class HomepageTests(TestCase):
             source = (Path(settings.BASE_DIR) / app / "views.py").read_text(
                 encoding="utf-8"
             )
-            self.assertNotIn("page(", source.replace("page_not_found(", ""))
+            self.assertIsNone(re.search(r"\bpage\(", source))
             self.assertNotIn("HttpResponse", source)
             self.assertIn("render(", source)

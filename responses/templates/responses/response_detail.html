@@ -1,50 +1,39 @@
 {% extends "base.html" %}
 
 {% block title %}
-    {% if response %}
-        Ответ №{{ response.id }} – Сервис обратной связи
-    {% else %}
-        Ответ не найден – Сервис обратной связи
-    {% endif %}
+    Ответ №{{ response.id }} – Сервис обратной связи
 {% endblock %}
 
 {% block content %}
-    {% if response %}
-        <div class="card">
-            <div class="card-body">
-                <h1 class="card-title">
-                    Ответ №{{ response.id }}
-                </h1>
+    <div class="card">
+        <div class="card-body">
+            <h1 class="card-title">
+                Ответ №{{ response.id }}
+            </h1>
 
-                <p class="card-text">
-                    <strong>Исходное сообщение:</strong>
-                    <a href="{% url 'feedback:detail' response.message_id %}">
-                        Сообщение №{{ response.message_id }}
-                    </a>:
-                    {{ response.message_text }}
-                </p>
+            <p class="card-text">
+                <strong>Исходное сообщение:</strong>
+                <a href="{% url 'feedback:detail' response.message_id %}">
+                    Сообщение №{{ response.message_id }}
+                </a>:
+                {{ response.message.text }}
+            </p>
 
-                <p class="card-text">
-                    <strong>Автор сообщения:</strong>
-                    {{ response.author_name|default:"—" }}
-                </p>
+            <p class="card-text">
+                <strong>Автор сообщения:</strong>
+                {{ response.message.author.name|default:"—" }}
+            </p>
 
-                <p class="card-text">
-                    <strong>Дата ответа:</strong>
-                    {{ response.created_at }}
-                </p>
+            <p class="card-text">
+                <strong>Дата ответа:</strong>
+                {{ response.created_at|date:"d.m.Y H:i" }}
+            </p>
 
-                <p class="card-text">
-                    {{ response.text|linebreaksbr }}
-                </p>
-            </div>
+            <p class="card-text">
+                {{ response.text|linebreaksbr }}
+            </p>
         </div>
-    {% else %}
-        <h1 class="text-danger">Ответ не найден</h1>
-        <p>
-            Ответ с указанным идентификатором отсутствует.
-        </p>
-    {% endif %}
+    </div>
 
     <a
         href="{% url 'responses:list' %}"

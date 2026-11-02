@@ -1,13 +1,13 @@
-"""Вспомогательные средства для тестов: временная база данных SQLite."""
+"""Вспомогательные средства для тестов: тестовые данные в базе Django (ORM)."""
 
-import shutil
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
+from datetime import datetime
 
 from django.test import TestCase
+from django.utils import timezone
 
-from db import database
+from feedback.models import Message
+from responses.models import Response
+from users.models import User
 
 USERS = [
     (1, "Анна Иванова", "anna@example.com", "user"),
@@ -30,33 +30,28 @@ RESPONSES = [
 ]
 
 
-def create_test_database(path):
-    """Создать базу по sql/schema.sql и заполнить тестовыми данными."""
-    with patch.object(database, "DB_PATH", str(path)):
-        conn = database.get_connection(create=True)
-        try:
-            database.create_schema(conn)
-            conn.executemany("INSERT INTO users VALUES (?, ?, ?, ?)", USERS)
-            conn.executemany(
-                "INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)", MESSAGES
-            )
-            conn.executemany(
-                "INSERT INTO responses VALUES (?, ?, ?, ?)", RESPONSES
-            )
-            conn.commit()
-        finally:
-            conn.close()
+def _dt(value):
+    return timezone.make_aware(datetime.strptime(value, "%Y-%m-%d %H:%M"))
 
 
-class TempDatabaseTestCase(TestCase):
-    """Базовый класс: каждый тест работает с отдельной временной базой."""
+def create_test_data():
+    """Заполнить тестовую базу Django данными через ORM."""
+    for pk, name, email, role in USERS:
+        User.objects.create(pk=pk, name=name, email=email, role=role)
+    for pk, author_id, category, text, status, created_at in MESSAGES:
+        Message.objects.create(
+            pk=pk, author_id=author_id, category=category, text=text,
+            status=status, created_at=_dt(created_at),
+        )
+    for pk, message_id, text, created_at in RESPONSES:
+        Response.objects.create(
+            pk=pk, message_id=message_id, text=text, created_at=_dt(created_at),
+        )
 
-    def setUp(self):
-        super().setUp()
-        tmp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, tmp_dir, ignore_errors=True)
-        self.db_path = Path(tmp_dir) / "test.sqlite"
-        create_test_database(self.db_path)
-        patcher = patch.object(database, "DB_PATH", str(self.db_path))
-        patcher.start()
-        self.addCleanup(patcher.stop)
+
+class SampleDataTestCase(TestCase):
+    """Базовый класс: тесты работают с одними и теми же данными в тестовой БД."""
+
+    @classmethod
+    def setUpTestData(cls):
+        create_test_data()

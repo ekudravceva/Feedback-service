@@ -1,9 +1,11 @@
 from django.urls import NoReverseMatch, reverse
 
-from db.testing import TempDatabaseTestCase
+from db.testing import SampleDataTestCase
+from feedback.models import Message
+from responses.models import Response
 
 
-class MessageViewsTests(TempDatabaseTestCase):
+class MessageViewsTests(SampleDataTestCase):
     def test_list(self):
         response = self.client.get(reverse("feedback:list"))
         self.assertEqual(response.status_code, 200)
@@ -13,24 +15,18 @@ class MessageViewsTests(TempDatabaseTestCase):
         self.assertContains(response, "Всего сообщений: 3")
         self.assertContains(response, "Анна Иванова")
 
-    def test_list_context_contains_rows_from_sql(self):
+    def test_list_context_contains_model_objects(self):
         response = self.client.get("/messages/")
         messages = response.context["messages_list"]
         self.assertEqual(len(messages), 3)
-        # Строки результата доступны по именам столбцов (sqlite3.Row).
-        self.assertEqual(messages[0]["author_name"], "Анна Иванова")
-        # Порядок задан ORDER BY created_at DESC: самое новое сообщение первое.
-        self.assertEqual([m["id"] for m in messages], [3, 2, 1])
+        # Связанный автор доступен через внешний ключ (select_related).
+        self.assertEqual(messages[0].author.name, "Анна Иванова")
+        # Порядок: самое новое сообщение первое.
+        self.assertEqual([m.id for m in messages], [3, 2, 1])
 
     def test_list_empty(self):
-        import sqlite3
-
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("DELETE FROM responses")
-        conn.execute("DELETE FROM messages")
-        conn.commit()
-        conn.close()
+        Response.objects.all().delete()
+        Message.objects.all().delete()
         response = self.client.get("/messages/")
         self.assertContains(response, "Сообщения не найдены.")
 
@@ -48,9 +44,6 @@ class MessageViewsTests(TempDatabaseTestCase):
     def test_detail_not_found(self):
         response = self.client.get("/messages/999/")
         self.assertEqual(response.status_code, 404)
-        self.assertContains(
-            response, "Сообщение не найдено", status_code=404
-        )
 
     def test_non_int_id_is_not_routed(self):
         self.assertEqual(self.client.get("/messages/abc/").status_code, 404)
@@ -78,17 +71,17 @@ class MessageViewsTests(TempDatabaseTestCase):
     def test_unanswered(self):
         response = self.client.get(reverse("feedback:unanswered"))
         self.assertEqual(response.status_code, 200)
-        ids = [m["id"] for m in response.context["messages_list"]]
+        ids = [m.id for m in response.context["messages_list"]]
         self.assertEqual(ids, [1, 3])
         self.assertContains(response, "Всего: 2")
 
 
-class MessageSearchTests(TempDatabaseTestCase):
+class MessageSearchTests(SampleDataTestCase):
     def search(self, **params):
         return self.client.get(reverse("feedback:search"), params)
 
     def ids(self, response):
-        return [m["id"] for m in response.context["results"]]
+        return [m.id for m in response.context["results"]]
 
     def test_form_without_parameters_does_not_query(self):
         response = self.search()
@@ -129,14 +122,14 @@ class MessageSearchTests(TempDatabaseTestCase):
         self.assertEqual(self.ids(response), [])
 
 
-class StatisticsTests(TempDatabaseTestCase):
+class StatisticsTests(SampleDataTestCase):
     def test_statistics(self):
         response = self.client.get(reverse("feedback:statistics"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "feedback/statistics.html")
         self.assertEqual(response.context["total"]["messages_count"], 3)
         self.assertEqual(
-            response.context["unanswered_count"]["unanswered_count"], 2
+            response.context["unanswered_count"], 2
         )
         by_status = {
             row["status"]: row["messages_count"]
@@ -160,7 +153,7 @@ class StatisticsTests(TempDatabaseTestCase):
         names = [r["author_name"] for r in response.context["active_authors"]]
         self.assertEqual(names, ["Анна Иванова"])
         response = self.client.get("/messages/statistics/", {"more_than": 2})
-        self.assertEqual(response.context["active_authors"], [])
+        self.assertEqual(list(response.context["active_authors"]), [])
         self.assertContains(response, "Нет авторов")
 
     def test_invalid_threshold_falls_back_to_default(self):

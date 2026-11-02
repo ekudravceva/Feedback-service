@@ -1,9 +1,10 @@
 from django.urls import reverse
 
-from db.testing import TempDatabaseTestCase
+from db.testing import SampleDataTestCase
+from responses.models import Response
 
 
-class ResponseViewsTests(TempDatabaseTestCase):
+class ResponseViewsTests(SampleDataTestCase):
     def test_list(self):
         response = self.client.get(reverse("responses:list"))
         self.assertEqual(response.status_code, 200)
@@ -11,12 +12,7 @@ class ResponseViewsTests(TempDatabaseTestCase):
         self.assertContains(response, "Всего ответов: 1")
 
     def test_list_empty(self):
-        import sqlite3
-
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("DELETE FROM responses")
-        conn.commit()
-        conn.close()
+        Response.objects.all().delete()
         response = self.client.get("/responses/")
         self.assertContains(response, "Ответы не найдены.")
 
@@ -32,4 +28,3 @@ class ResponseViewsTests(TempDatabaseTestCase):
     def test_detail_not_found(self):
         response = self.client.get("/responses/999/")
         self.assertEqual(response.status_code, 404)
-        self.assertContains(response, "Ответ не найден", status_code=404)

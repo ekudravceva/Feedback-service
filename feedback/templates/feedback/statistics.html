@@ -20,7 +20,7 @@
             <div class="card statistics-item">
                 <div class="card-body">
                     <h2 class="h6">Без ответа</h2>
-                    <p class="display-6">{{ unanswered_count.unanswered_count }}</p>
+                    <p class="display-6">{{ unanswered_count }}</p>
                 </div>
             </div>
         </div>
@@ -29,8 +29,8 @@
                 <div class="card-body">
                     <h2 class="h6">Период обращений</h2>
                     <p class="mb-0">
-                        {{ total.first_message|default:"—" }}<br>
-                        {{ total.last_message|default:"—" }}
+                        {{ total.first_message|date:"d.m.Y H:i"|default:"—" }}<br>
+                        {{ total.last_message|date:"d.m.Y H:i"|default:"—" }}
                     </p>
                 </div>
             </div>

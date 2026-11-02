@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'homepage',
     'feedback',
     'responses',
+    'users',
 ]
 
 MIDDLEWARE = [
