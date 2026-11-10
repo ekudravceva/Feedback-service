@@ -13,7 +13,7 @@
 
             <p class="card-text">
                 <strong>Исходное сообщение:</strong>
-                <a href="{% url 'feedback:detail' response.message_id %}">
+                <a href="{{ response.message.get_absolute_url }}">
                     Сообщение №{{ response.message_id }}
                 </a>:
                 {{ response.message.text }}

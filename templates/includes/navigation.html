@@ -1,6 +1,6 @@
 <nav class="nav container">
     <a class="nav-link" href="{% url 'homepage:index' %}">Главная</a>
-    <a class="nav-link" href="{% url 'feedback:list' %}">Сообщения</a>
+    <a class="nav-link" href="{% url 'feedback:list' %}">Сообщения ({{ messages_count }})</a>
     <a class="nav-link" href="{% url 'responses:list' %}">Ответы</a>
     <a class="nav-link" href="{% url 'feedback:statistics' %}">Статистика</a>
 </nav>

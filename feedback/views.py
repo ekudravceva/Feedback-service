@@ -21,7 +21,7 @@ SORT_FIELDS = {
 
 
 def _statuses():
-    return [value for value, _ in Message.STATUS_CHOICES]
+    return [value for value, _ in Message.Status.choices]
 
 
 def _parse_date(value):
@@ -49,7 +49,7 @@ def messages(request):
     if author_id.isdigit():
         messages_qs = messages_qs.filter(author_id=int(author_id))
     if hide_closed:
-        messages_qs = messages_qs.exclude(status=Message.STATUS_CLOSED)
+        messages_qs = messages_qs.exclude(status=Message.Status.CLOSED)
 
     sort_field = SORT_FIELDS.get(sort, SORT_FIELDS["date"])
     messages_qs = messages_qs.order_by(sort_field, "-pk")
@@ -77,10 +77,10 @@ def messages(request):
     )
 
 
-def message_detail(request, message_id):
+def message_detail(request, slug):
     message = get_object_or_404(
         Message.objects.select_related("author"),
-        pk=message_id,
+        slug=slug,
     )
 
     context = {
@@ -100,8 +100,8 @@ def unanswered(request):
     # LEFT JOIN с ответами: остаются сообщения, у которых ответов нет.
     messages_qs = (
         Message.objects
+        .unanswered()
         .select_related("author")
-        .filter(responses__isnull=True)
         .order_by("created_at")
     )
 
@@ -195,9 +195,7 @@ def statistics(request):
 
     context = {
         "total": total,
-        "unanswered_count": Message.objects.filter(
-            responses__isnull=True,
-        ).count(),
+        "unanswered_count": Message.objects.unanswered().count(),
         "by_status": (
             Message.objects
             .values("status")

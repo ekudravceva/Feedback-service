@@ -23,6 +23,7 @@ class User(models.Model):
         choices=ROLE_CHOICES,
         default=ROLE_USER,
         verbose_name="Роль",
+        help_text="Только пользователь с ролью «Пользователь» может создавать сообщения.",
     )
 
     def get_role_description(self):

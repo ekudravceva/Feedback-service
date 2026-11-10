@@ -27,6 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
+# Django Debug Toolbar показывается только для локальных запросов.
+INTERNAL_IPS = ["127.0.0.1"]
+
 
 # Application definition
 
@@ -41,10 +44,12 @@ INSTALLED_APPS = [
     'feedback',
     'responses',
     'users',
+    'debug_toolbar',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,6 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'feedback.context_processors.feedback_context',
             ],
         },
     },

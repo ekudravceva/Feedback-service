@@ -9,5 +9,5 @@ urlpatterns = [
     path("search/", views.search, name="search"),
     path("unanswered/", views.unanswered, name="unanswered"),
     path("statistics/", views.statistics, name="statistics"),
-    path("<int:message_id>/", views.message_detail, name="detail"),
+    path("<slug:slug>/", views.message_detail, name="detail"),
 ]

@@ -5,7 +5,8 @@
 Приложение для сбора, обработки и управления отзывами и обращениями
 пользователей. Консольная версия дополнена веб-интерфейсом на Django, который в ПР6 переведён на систему шаблонов Django, в ПР7 получал
 данные из реляционной базы SQLite SQL-запросами, а в ПР9 переведён на Django ORM
-(модели, миграции, ORM-запросы). Сервис позволяет
+(модели, миграции, ORM-запросы); в ПР10 настроена административная панель Django и
+проверены ORM-запросы. Сервис позволяет
 пользователям оставлять сообщения с обратной связью по различным категориям,
 а администраторам — управлять этими сообщениями и давать на них ответы.
 
@@ -42,6 +43,9 @@
 - JavaScript — небольшое клиентское поведение интерфейса;
 - SQLite — реляционное хранение данных;
 - Django ORM и миграции — модели, связи и запросы к базе (ПР9);
+- Django Admin — административная панель (ПР10);
+- django-debug-toolbar — анализ SQL-запросов при разработке (ПР10);
+- Unidecode — транслитерация названия категории в slug (ПР10);
 - SQL и sqlite3 — слой ПР7 и источник данных для переноса (`sql/`, `db/`);
 - JSON — исходные данные и хранилище консольной версии;
 - pytest — автоматизированные тесты;
@@ -154,13 +158,15 @@
 |---|---|---|---|
 | `/` | `homepage:index` | `index()` | `homepage/index.html` |
 | `/messages/` | `feedback:list` | `messages()` | `feedback/message_list.html` |
-| `/messages/<int:message_id>/` | `feedback:detail` | `message_detail()` | `feedback/message_detail.html` |
+| `/messages/<slug:slug>/` | `feedback:detail` | `message_detail()` | `feedback/message_detail.html` |
 | `/messages/search/` | `feedback:search` | `search()` | `feedback/message_search.html` |
 | `/messages/unanswered/` | `feedback:unanswered` | `unanswered()` | `feedback/message_unanswered.html` |
 | `/messages/statistics/` | `feedback:statistics` | `statistics()` | `feedback/statistics.html` |
 | `/responses/` | `responses:list` | `responses()` | `responses/response_list.html` |
 | `/responses/<int:response_id>/` | `responses:detail` | `response_detail()` | `responses/response_detail.html` |
 
+Сообщение открывается по уникальному slug (например,
+`/messages/zhaloba-2/`), адрес формирует `Message.get_absolute_url()`.
 Все страницы, кроме главной, получают данные через Django ORM
 (подробнее — в разделе «Django ORM (ПР9)»). Если сообщение или ответ с
 указанным идентификатором не найден, `get_object_or_404()` возвращает код
@@ -171,7 +177,7 @@
 Пользовательские сценарии веб-интерфейса:
 
 1. просмотр списка сообщений с фильтрами, сортировкой и пагинацией (`/messages/`);
-2. просмотр сообщения с автором и ответом (`/messages/<id>/`);
+2. просмотр сообщения с автором и ответом (`/messages/<slug>/`);
 3. просмотр списка ответов и ответа с исходным сообщением (`/responses/…`);
 4. поиск сообщений по категории, статусу, тексту и дате (`/messages/search/`);
 5. сообщения без ответа (`/messages/unanswered/`);
@@ -332,8 +338,15 @@ message = conn.execute(DETAIL_SQL, [message_id]).fetchone()
 | Модель | Приложение | Поля | Связи |
 |---|---|---|---|
 | `User` | `users` | `name`, `email`, `role` (`user` / `admin`) | — |
-| `Message` | `feedback` | `author`, `category`, `text`, `status`, `created_at` | `author` — `ForeignKey(User, on_delete=PROTECT, related_name="messages")` |
+| `Message` | `feedback` | `author`, `category`, `text`, `status`, `created_at`, `slug`, `is_long` | `author` — `ForeignKey(User, on_delete=PROTECT, related_name="messages")` |
 | `Response` | `responses` | `message`, `text`, `created_at` | `message` — `ForeignKey(Message, on_delete=PROTECT, related_name="responses")`, `UniqueConstraint` по `message` (один ответ на сообщение) |
+
+Статусы сообщения заданы перечислением `Message.Status` (`TextChoices`:
+`NEW`, `PROCESSING`, `CLOSED`); значения в базе остались прежними. Поле
+`slug` — уникальный URL-идентификатор: транслитерированная категория и `id`
+(`zhaloba-2`), создаётся при первом сохранении и далее не меняется.
+Поле `is_long` — `GeneratedField`: база сама вычисляет признак «длинное
+сообщение» (текст не короче 200 символов, `LONG_TEXT_LENGTH`).
 
 `PROTECT` не позволяет удалить пользователя с сообщениями и сообщение с
 ответом — история обращений сохраняется. Обратные связи:
@@ -361,6 +374,14 @@ python db/import_sqlite_to_orm.py
 преобразуются в aware-`datetime`. Повторный запуск безопасен. Проверка:
 `python manage.py shell` → `Message.objects.count()` и т. п. Отмена изменений
 структуры — `python manage.py migrate <app> zero`.
+
+### Менеджер сообщений
+
+`Message.objects` — `MessageManager` на основе `MessageQuerySet`: методы
+`new()`, `processing()`, `closed()`, `for_date(date)`, `unanswered()` можно
+сочетать с другими условиями ORM. `Message.objects.all()` по-прежнему
+возвращает все сообщения. Страница `/messages/unanswered/` и статистика
+используют `unanswered()`.
 
 ### ORM-запросы в представлениях
 
@@ -391,8 +412,47 @@ python db/import_sqlite_to_orm.py
 по кириллице выполнен через `iregex`: `LIKE` и `LOWER()` в SQLite различают
 регистр только для латиницы.
 
+Анализ SQL-запросов в ПР10 (число запросов на страницу, включая запрос
+количества сообщений для навигации): список сообщений — 4, карточка — 3,
+список и карточка ответа — 2, сообщения без ответа — 2, статистика — 7. Повторных
+запросов к автору и сообщению для каждой строки нет: данные получаются через
+`select_related()`. Запрос подсчёта для пагинации и справочник авторов для
+фильтра — ожидаемые отдельные запросы. Запросы страницы можно посмотреть в
+Django Debug Toolbar (раздел SQL).
+
 SQL-слой ПР7 (`sql/`, `db/database.py`, `db/import_json.py`) сохранён как
 предыдущая реализация; представления его больше не используют.
+
+## Административная панель Django (ПР10)
+
+Панель доступна по адресу `/admin/`. Для входа нужна учётная запись Django
+(`python manage.py createsuperuser`); это не объект `users.User`. Названия
+приложений заданы через `AppConfig.verbose_name`, моделей и полей — через
+`verbose_name`, язык — `LANGUAGE_CODE = "ru-RU"`.
+
+| Модель | Настройки `ModelAdmin` |
+|---|---|
+| `User` | столбцы, поиск по имени и почте, фильтр по роли, `list_editable` для роли, число сообщений (`annotate`), inline с сообщениями пользователя |
+| `Message` | столбцы, поиск по автору и тексту, фильтры по статусу, категории и дате, `date_hierarchy`, `list_select_related`, `autocomplete_fields`, inline с ответом, действия «Закрыть выбранные сообщения» (`mark_closed()`) и «Вернуть в обработку» |
+| `Response` | столбцы, поиск, фильтр по дате, `autocomplete_fields` |
+
+Поле `id` показывается только для чтения (`readonly_fields`), у роли
+пользователя добавлена подсказка `help_text`. Админка не заменяет бизнес-правила:
+например, она не запрещает вручную поставить статус «закрыта» сообщению без
+ответа, а повторный ответ на сообщение запрещён только ограничением базы данных.
+
+### Django Debug Toolbar
+
+Подключён в `settings.py` (`INSTALLED_APPS`, `MIDDLEWARE`, `INTERNAL_IPS`) и в
+`feedback_service/urls.py` (маршрут `__debug__/` только при `DEBUG = True`).
+Только для разработки.
+
+### Контекстный процессор
+
+`feedback.context_processors.feedback_context` передаёт во все шаблоны
+`site_name` и `messages_count`; он зарегистрирован в
+`TEMPLATES["OPTIONS"]["context_processors"]`, число сообщений выводится в
+навигации.
 
 ## Шаблоны Django (ПР6)
 
@@ -439,7 +499,8 @@ return render(request, "feedback/message_list.html", context)
 `feedback:unanswered`, `feedback:statistics`, `responses:list`,
 `responses:detail`.
 Ссылки в шаблонах формируются тегом `{% url %}`, например
-`{% url 'feedback:detail' message.id %}`; жёстко заданных адресов нет.
+`{% url 'responses:detail' response.id %}`; ссылки на сообщение — через
+`{{ message.get_absolute_url }}`; жёстко заданных адресов нет.
 
 ### Фильтры шаблонов
 
@@ -472,19 +533,19 @@ return render(request, "feedback/message_list.html", context)
 - `homepage/` — главная страница: `views.py` (`index()`, обработчик 404
   `page_not_found()`), `urls.py`, `templates/homepage/` (`index.html`,
   `404.html`), `static/homepage/` (CSS, JS, логотип);
-- `feedback/` — приложение сообщений: `models.py` (`Message`), `migrations/`, `views.py` (`messages()`,
+- `feedback/` — приложение сообщений: `models.py` (`Message`, `MessageQuerySet`, `MessageManager`), `admin.py`, `context_processors.py`, `migrations/`, `views.py` (`messages()`,
   `message_detail()`, `search()`, `unanswered()`, `statistics()`), `urls.py`,
   `templates/feedback/` (`message_list.html`, `message_detail.html`,
   `message_search.html`, `message_unanswered.html`, `statistics.html`,
   `includes/message_card.html`, `includes/message_status.html`);
-- `responses/` — приложение ответов: `models.py` (`Response`), `migrations/`, `views.py` (`responses()`,
+- `responses/` — приложение ответов: `models.py` (`Response`), `admin.py`, `migrations/`, `views.py` (`responses()`,
   `response_detail()`), `urls.py`, `templates/responses/`
   (`response_list.html`, `response_detail.html`);
 - `db/` — слой SQLite из ПР7 (`database.py`, `import_json.py`) и перенос в ORM;
 - `sql/` — SQL-файлы (`schema.sql`, `queries.sql`);
 - `data/` — JSON-файлы (консольная версия) и исходная база `feedback.sqlite`;
 - `db.sqlite3` — база Django (в репозиторий не входит, создаётся миграциями);
-- `users/` — приложение пользователей: модель `User`, миграции;
+- `users/` — приложение пользователей: модель `User`, `admin.py`, миграции;
 - `db/import_sqlite_to_orm.py` — перенос данных из `data/feedback.sqlite` в
   базу Django (ПР9); `db/testing.py` — тестовые данные для веб-тестов.
 
@@ -595,6 +656,7 @@ python manage.py test
 ```
 
 `pytest` проверяет предметную область (ПР3) и слой SQL ПР7, `manage.py test` —
+административная панель, менеджер, slug, вычисляемое поле, контекстный процессор,
 модели и страницы Django-приложений: шаблоны, пространства имён URL, коды
 ответов (в том числе 404), пустые списки, экранирование HTML, статические
 файлы, фильтры, сортировку, пагинацию, поиск, статистику, ограничения связей.
@@ -644,6 +706,9 @@ git status
   сообщения, ответов, поиска, сообщений без ответа и статистики.
 - модели Django `User`, `Message`, `Response` со связями, миграции,
   перенос данных из базы ПР7, все представления переведены на ORM, фильтрация,
-  сортировка и пагинация списка сообщений.
+  сортировка и пагинация списка сообщений;
+- административная панель для трёх моделей, `TextChoices` для статусов,
+  менеджер сообщений, slug и `get_absolute_url()`, `GeneratedField`,
+  контекстный процессор, Django Debug Toolbar (ПР10).
 
 Формы создания сообщений и ответов через веб-интерфейс пока не реализованы.

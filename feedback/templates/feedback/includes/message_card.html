@@ -20,7 +20,7 @@
         </p>
 
         <a
-            href="{% url 'feedback:detail' message.id %}"
+            href="{{ message.get_absolute_url }}"
             class="btn btn-primary"
         >
             Подробнее

@@ -5,6 +5,11 @@ from feedback.models import Message
 from responses.models import Response
 
 
+def url(message_id):
+    """Адрес карточки сообщения по его slug."""
+    return Message.objects.get(pk=message_id).get_absolute_url()
+
+
 class MessageViewsTests(SampleDataTestCase):
     def test_list(self):
         response = self.client.get(reverse("feedback:list"))
@@ -31,31 +36,31 @@ class MessageViewsTests(SampleDataTestCase):
         self.assertContains(response, "Сообщения не найдены.")
 
     def test_detail(self):
-        response = self.client.get(reverse("feedback:detail", args=[1]))
+        response = self.client.get(url(1))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "feedback/message_detail.html")
         self.assertContains(response, "Анна Иванова")
         self.assertContains(response, "ответа пока нет")
 
     def test_detail_with_response_link(self):
-        response = self.client.get("/messages/2/")
+        response = self.client.get(url(2))
         self.assertContains(response, reverse("responses:detail", args=[1]))
 
     def test_detail_not_found(self):
-        response = self.client.get("/messages/999/")
+        response = self.client.get("/messages/zhaloba-999/")
         self.assertEqual(response.status_code, 404)
 
-    def test_non_int_id_is_not_routed(self):
+    def test_unknown_slug_is_404(self):
         self.assertEqual(self.client.get("/messages/abc/").status_code, 404)
         with self.assertRaises(NoReverseMatch):
-            reverse("feedback:detail", args=["abc"])
+            reverse("feedback:detail", args=["bad slug"])
 
     def test_sql_injection_in_url_is_not_possible(self):
         response = self.client.get("/messages/1 OR 1=1/")
         self.assertEqual(response.status_code, 404)
 
     def test_html_in_text_is_escaped(self):
-        response = self.client.get("/messages/3/")
+        response = self.client.get(url(3))
         self.assertNotContains(response, "<script>alert(1)</script>")
         self.assertContains(response, "&lt;script&gt;")
 
@@ -65,7 +70,7 @@ class MessageViewsTests(SampleDataTestCase):
             (3, "message-status-processing"),
             (2, "message-status-closed"),
         ):
-            response = self.client.get(f"/messages/{message_id}/")
+            response = self.client.get(url(message_id))
             self.assertContains(response, css)
 
     def test_unanswered(self):

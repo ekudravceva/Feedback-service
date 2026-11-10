@@ -2,3 +2,5 @@ Django==5.2.*
 pytest>=8.0
 flake8>=7.0
 mypy>=1.0
+django-debug-toolbar>=4.4
+Unidecode>=1.3
